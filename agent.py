@@ -2,7 +2,7 @@ import requests
 from datetime import datetime
 import json
 
-TOKEN = "8479448510:AAFxgJOeL0gVheefOdPY1cqWkP3xg88o9LA"
+TOKEN = os.getenv("BOT_TOKEN")
 CHAT_IDS_FILE = "chat_ids.txt"
 NEWS_FILE = "weekly_news.json"
 COINGECKO_API = "https://api.coingecko.com/api/v3"
