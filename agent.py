@@ -1,10 +1,8 @@
 import requests
 import json
 from datetime import datetime
-import schedule
-import time
 
-TOKEN = "8479448510:AAFxgJOeL0gVheefOdPY1cqWkP3xg88o9LA"  # Twój token bota
+TOKEN = "8479448510:AAFxgJOeL0gVheefOdPY1cqWkP3xg88o9LA"
 CHAT_IDS_FILE = "chat_ids.txt"
 
 # --- Funkcje pomocnicze ---
@@ -48,21 +46,18 @@ def send_message(text):
 # --- Funkcje raportów ---
 def daily_report():
     save_chat_ids()
-    # Tu dodaj logikę pobierania cen top 100 + wzrost w stosunku do BTC od dołka 2022
+    # Tutaj dodaj logikę pobierania cen top 100 i wzrostów względem BTC
     report = f"📅 {datetime.now().date()}\nTwój codzienny raport Crypto AI"
     send_message(report)
 
 def weekly_report():
     save_chat_ids()
-    # Tu dodaj logikę oceny trendu rynku
+    # Tutaj dodaj logikę oceny trendu rynku
     report = f"📅 {datetime.now().date()}\n📊 Tygodniowe podsumowanie rynku"
     send_message(report)
 
-# --- Harmonogram ---
-schedule.every().day.at("09:00").do(daily_report)           # codzienny raport
-schedule.every().monday.at("09:00").do(weekly_report)       # cotygodniowe podsumowanie
-
-# --- Pętla główna ---
-while True:
-    schedule.run_pending()
-    time.sleep(60)
+# --- Logika wywołania dla GitHub Actions ---
+today_weekday = datetime.today().weekday()  # 0 = poniedziałek
+daily_report()
+if today_weekday == 0:  # Poniedziałek = raport tygodniowy
+    weekly_report()
