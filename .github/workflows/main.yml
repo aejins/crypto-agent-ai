@@ -4,8 +4,6 @@ on:
   schedule:
     # Codziennie o 09:00 UTC
     - cron: "0 9 * * *"
-    # Co tydzień w poniedziałek o 09:00 UTC
-    - cron: "0 9 * * 1"
   workflow_dispatch:  # pozwala uruchomić ręcznie
 
 jobs:
@@ -24,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests schedule
+          pip install requests
 
       - name: Run Agent
         env:
