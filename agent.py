@@ -2,7 +2,7 @@ import requests
 import feedparser
 from datetime import datetime
 
-TELEGRAM_TOKEN = "8584567848:AAGth7ASwSTGn45bxal8ZX89JxAyAS5iupc"
+TELEGRAM_TOKEN = "8479448510:AAFxgJOeL0gVheefOdPY1cqWkP3xg88o9LA"
 CHAT_ID = None
 
 RSS_FEEDS = [
