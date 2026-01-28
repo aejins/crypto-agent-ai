@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Run Agent
+      - name: Run Crypto AI Agent
         env:
           TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
