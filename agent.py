@@ -4,7 +4,7 @@ from datetime import datetime
 import schedule
 import time
 
-TOKEN = "TU_WKLEJ_TOKEN_BOTA"  # Twój token bota
+TOKEN = "8479448510:AAFxgJOeL0gVheefOdPY1cqWkP3xg88o9LA"  # Twój token bota
 CHAT_IDS_FILE = "chat_ids.txt"
 
 # --- Funkcje pomocnicze ---
