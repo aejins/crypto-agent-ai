@@ -1,4 +1,4 @@
-name: Crypto AI Agent
+name: Crypto AI News Agent
 
 on:
   schedule:
@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-bot:
+  run-agent:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -20,9 +20,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests
+          pip install requests feedparser
 
-      - name: Run bot
+      - name: Run crypto news agent
         run: |
           python crypto_bot.py
         env:
