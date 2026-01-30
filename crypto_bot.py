@@ -27,7 +27,7 @@ MAX_MSG_LEN = 3900
 
 def send_message(text):
     url = f"{TELEGRAM_API}/sendMessage"
-    requests.post(url, data={"chat_id": "@YOUR_USERNAME", "text": text})
+    requests.post(url, data={"chat_id": "@crypto_aejins_bot", "text": text})
 
 
 def classify_news(title):
