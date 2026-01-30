@@ -1,113 +1,177 @@
+import os
 import requests
-from datetime import datetime
 import json
+from datetime import datetime
 
+# ================= CONFIG =================
 TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise RuntimeError("❌ Brak BOT_TOKEN w zmiennych środowiskowych")
+
 CHAT_IDS_FILE = "chat_ids.txt"
 NEWS_FILE = "weekly_news.json"
-COINGECKO_API = "https://api.coingecko.com/api/v3"
+OFFSET_FILE = "offset.txt"
 
-# --- Chat ID ---
+COINGECKO_API = "https://api.coingecko.com/api/v3"
+TELEGRAM_API = f"https://api.telegram.org/bot{TOKEN}"
+
+MAX_MSG_LEN = 3900
+TIMEOUT = 10
+
+# ================= CHAT IDS =================
 def get_chat_ids():
     try:
         with open(CHAT_IDS_FILE, "r") as f:
-            return [line.strip() for line in f]
+            return [line.strip() for line in f if line.strip()]
     except FileNotFoundError:
         return []
 
 def save_chat_ids():
-    url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
-    resp = requests.get(url).json()
-    chat_ids = set(get_chat_ids())
-    for update in resp.get("result", []):
-        if "message" in update:
-            cid = str(update["message"]["chat"]["id"])
-            chat_ids.add(cid)
-    with open(CHAT_IDS_FILE, "w") as f:
-        for cid in chat_ids:
-            f.write(cid + "\n")
-
-# --- Wysyłka wiadomości ---
-def send_message(text):
-    for chat_id in get_chat_ids():
-        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": chat_id, "text": text})
-
-# --- Pobranie top 100 coinów i obliczenie wzrostów względem BTC od dołka 2022 ---
-def get_top100_report():
-    url = f"{COINGECKO_API}/coins/markets"
-    params = {
-        "vs_currency": "usd",
-        "order": "market_cap_desc",
-        "per_page": 100,
-        "page": 1,
-        "price_change_percentage": "all"
-    }
-    data = requests.get(url, params=params).json()
-    report = ""
-    for coin in data:
-        name = coin["name"]
-        symbol = coin["symbol"].upper()
-        price = coin["current_price"]
-        change = coin.get("price_change_percentage_ath", 0)  # przybliżenie wzrostu od ATH lub dołka
-        report += f"{name} ({symbol}): ${price:.2f}, wzrost od dołka: {change:.2f}%\n"
-    return report
-
-# --- Pobieranie newsów i ocena wpływu ---
-def save_news(news_list):
+    offset = 0
     try:
-        with open(NEWS_FILE, "r") as f:
-            weekly_news = json.load(f)
-    except FileNotFoundError:
-        weekly_news = []
+        with open(OFFSET_FILE, "r") as f:
+            offset = int(f.read().strip())
+    except:
+        pass
 
-    weekly_news.extend(news_list)
-    with open(NEWS_FILE, "w") as f:
-        json.dump(weekly_news, f)
+    resp = requests.get(
+        f"{TELEGRAM_API}/getUpdates",
+        params={"offset": offset},
+        timeout=TIMEOUT
+    ).json()
+
+    chat_ids = set(get_chat_ids())
+    last_update_id = offset
+
+    for update in resp.get("result", []):
+        last_update_id = update["update_id"] + 1
+        if "message" in update:
+            chat_ids.add(str(update["message"]["chat"]["id"]))
+
+    with open(CHAT_IDS_FILE, "w") as f:
+        f.write("\n".join(chat_ids))
+
+    with open(OFFSET_FILE, "w") as f:
+        f.write(str(last_update_id))
+
+# ================= TELEGRAM =================
+def send_message(text):
+    chat_ids = get_chat_ids()
+    if not chat_ids:
+        return
+
+    chunks = [text[i:i+MAX_MSG_LEN] for i in range(0, len(text), MAX_MSG_LEN)]
+
+    for chat_id in chat_ids:
+        for chunk in chunks:
+            requests.post(
+                f"{TELEGRAM_API}/sendMessage",
+                data={
+                    "chat_id": chat_id,
+                    "text": chunk,
+                    "parse_mode": "Markdown"
+                },
+                timeout=TIMEOUT
+            )
+
+# ================= COINGECKO =================
+def get_top100_altbtc():
+    try:
+        resp = requests.get(
+            f"{COINGECKO_API}/coins/markets",
+            params={
+                "vs_currency": "btc",
+                "order": "market_cap_desc",
+                "per_page": 100,
+                "page": 1
+            },
+            timeout=TIMEOUT
+        )
+        data = resp.json()
+    except Exception:
+        return None
+
+    if not isinstance(data, list):
+        return None
+
+    coins = []
+    for c in data:
+        coins.append({
+            "name": c["name"],
+            "symbol": c["symbol"].upper(),
+            "price_btc": c["current_price"]
+        })
+
+    return coins
+
+# ================= REPORTS =================
+def build_daily_report():
+    coins = get_top100_altbtc()
+    if not coins:
+        return "⚠️ Błąd pobierania danych z CoinGecko"
+
+    coins_sorted = sorted(coins, key=lambda x: x["price_btc"], reverse=True)
+
+    top10 = coins_sorted[:10]
+    bottom10 = coins_sorted[-10:]
+
+    report = f"📅 *{datetime.now().date()}*\n"
+    report += "*📊 DAILY ALT/BTC REPORT*\n\n"
+
+    report += "🔥 *TOP 10 ALT vs BTC*\n"
+    for c in top10:
+        report += f"{c['symbol']} — `{c['price_btc']:.8f} BTC`\n"
+
+    report += "\n🩸 *BOTTOM 10 ALT vs BTC*\n"
+    for c in bottom10:
+        report += f"{c['symbol']} — `{c['price_btc']:.8f} BTC`\n"
+
+    return report
 
 def analyze_weekly_trend():
     try:
         with open(NEWS_FILE, "r") as f:
-            weekly_news = json.load(f)
-    except FileNotFoundError:
-        weekly_news = []
+            news = json.load(f)
+    except:
+        news = []
 
-    # Prosta ocena trendu:
-    score = 0
-    for news in weekly_news:
-        score += news.get("impact", 0)  # zakładamy impact: +1 pozytywny, 0 neutralny, -1 negatywny
+    score = sum(n.get("impact", 0) for n in news)
 
     if score > 3:
-        trend = "Trend pozytywny 🟢"
+        trend = "🟢 Trend pozytywny"
     elif score < -3:
-        trend = "Trend negatywny 🔴"
+        trend = "🔴 Trend negatywny"
     else:
-        trend = "Trend neutralny 🟡"
+        trend = "🟡 Trend neutralny"
 
-    return trend, len(weekly_news)
+    return trend, len(news)
 
 def clear_weekly_news():
     with open(NEWS_FILE, "w") as f:
         json.dump([], f)
 
-# --- Raporty ---
+# ================= MAIN =================
 def daily_report():
     save_chat_ids()
-    report = f"📅 {datetime.now().date()}\n--- CODZIENNY RAPORT CRYPTO AI ---\n"
-    report += get_top100_report()
+    report = build_daily_report()
     send_message(report)
 
 def weekly_report():
     save_chat_ids()
-    trend, total_news = analyze_weekly_trend()
-    report = f"📅 {datetime.now().date()}\n--- TYGODNIOWE PODSUMOWANIE ---\n"
-    report += f"Liczba newsów w tygodniu: {total_news}\n{trend}"
+    trend, total = analyze_weekly_trend()
+
+    report = f"📅 *{datetime.now().date()}*\n"
+    report += "*📈 WEEKLY SUMMARY*\n\n"
+    report += f"News count: {total}\n"
+    report += f"{trend}"
+
     send_message(report)
     clear_weekly_news()
 
-# --- Wywołanie raportów ---
-today_weekday = datetime.today().weekday()  # 0 = poniedziałek
+# ================= RUN =================
+if __name__ == "__main__":
+    today = datetime.today().weekday()  # 0 = Monday
 
-daily_report()  # codzienny raport
-if today_weekday == 0:  # poniedziałek = raport tygodniowy
-    weekly_report()
+    daily_report()
+    if today == 0:
+        weekly_report()
